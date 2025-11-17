@@ -18,6 +18,11 @@
 
 package triangle;
 
+import java.util.List;
+
+import com.sampullara.cli.Args;
+import com.sampullara.cli.Option;
+
 import triangle.abstractSyntaxTrees.Program;
 import triangle.codeGenerator.Emitter;
 import triangle.codeGenerator.Encoder;
@@ -34,10 +39,17 @@ import triangle.treeDrawer.Drawer;
 public class Compiler {
 
 	/** The filename for the object program, normally obj.tam. */
+	@Option(name = "objectName", description = "The filename for the object program")
 	static String objectName = "obj.tam";
-	
+
+	@Option(name = "showTree", description = "Show the AST after contextual analysis")
 	static boolean showTree = false;
+	
+	@Option(name = "folding", description = "Enable constant folding optimisation")
 	static boolean folding = false;
+	
+	@Option(name = "showTreeAfter", description = "Show the AST after folding is complete")
+	static boolean showTreeAfter = false;
 
 	private static Scanner scanner;
 	private static Parser parser;
@@ -86,16 +98,21 @@ public class Compiler {
 		// scanner.enableDebugging();
 		theAST = parser.parseProgram(); // 1st pass
 		if (reporter.getNumErrors() == 0) {
-			// if (showingAST) {
-			// drawer.draw(theAST);
-			// }
 			System.out.println("Contextual Analysis ...");
 			checker.check(theAST); // 2nd pass
+
+			// Show AST after contextual analysis, if requested
 			if (showingAST) {
 				drawer.draw(theAST);
 			}
+
+			// Constant folding and optional tree display afterwards
 			if (folding) {
 				theAST.visit(new ConstantFolder());
+
+				if (showTreeAfter) {
+					drawer.draw(theAST);
+				}
 			}
 			
 			if (reporter.getNumErrors() == 0) {
@@ -117,37 +134,31 @@ public class Compiler {
 	/**
 	 * Triangle compiler main program.
 	 *
-	 * @param args the only command-line argument to the program specifies the
-	 *             source filename.
+	 * @param args the command-line arguments. First non-option argument specifies the
+	 *             source filename. Options:
+	 *             --objectName=<filename>
+	 *             --showTree
+	 *             --folding
+	 *             --showTreeAfter
 	 */
 	public static void main(String[] args) {
 
-		if (args.length < 1) {
-			System.out.println("Usage: tc filename [-o=outputfilename] [tree] [folding]");
+		// Parse CLI options into the static fields above
+		List<String> extra = Args.parseOrExit(Compiler.class, args);
+
+		if (extra.isEmpty()) {
+			System.out.println("Usage: tc <filename> [--objectName=<outputfilename>] [--showTree] [--folding] [--showTreeAfter]");
 			System.exit(1);
 		}
 		
-		parseArgs(args);
+		
 
-		String sourceName = args[0];
+		String sourceName = extra.get(0);
 		
 		var compiledOK = compileProgram(sourceName, objectName, showTree, false);
 
-		if (!showTree) {
+		if (!showTree && !showTreeAfter) {
 			System.exit(compiledOK ? 0 : 1);
-		}
-	}
-	
-	private static void parseArgs(String[] args) {
-		for (String s : args) {
-			var sl = s.toLowerCase();
-			if (sl.equals("tree")) {
-				showTree = true;
-			} else if (sl.startsWith("-o=")) {
-				objectName = s.substring(3);
-			} else if (sl.equals("folding")) {
-				folding = true;
-			}
 		}
 	}
 }
