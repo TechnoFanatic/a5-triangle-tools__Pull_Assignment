@@ -21,7 +21,7 @@ package triangle;
 import java.util.List;
 
 import com.sampullara.cli.Args;
-import com.sampullara.cli.Option;
+import com.sampullara.cli.Argument;
 
 import triangle.abstractSyntaxTrees.Program;
 import triangle.codeGenerator.Emitter;
@@ -38,18 +38,23 @@ import triangle.treeDrawer.Drawer;
  */
 public class Compiler {
 
+    /**
+     * Command-line options parsed via cli-parser.
+     */
+	public static class CLIOptions {
 	/** The filename for the object program, normally obj.tam. */
-	@Option(name = "objectName", description = "The filename for the object program")
-	static String objectName = "obj.tam";
+    @Argument(description = "The filename for the object program", alias = "o")
+    public String objectName = "obj.tam";
 
-	@Option(name = "showTree", description = "Show the AST after contextual analysis")
-	static boolean showTree = false;
-	
-	@Option(name = "folding", description = "Enable constant folding optimisation")
-	static boolean folding = false;
-	
-	@Option(name = "showTreeAfter", description = "Show the AST after folding is complete")
-	static boolean showTreeAfter = false;
+    @Argument(description = "Show the AST after contextual analysis")
+    public boolean showTree = false;
+
+    @Argument(description = "Enable constant folding optimisation")
+    public boolean folding = false;
+
+    @Argument(description = "Show the AST after folding is complete")
+    public boolean showTreeAfter = false;
+	}
 
 	private static Scanner scanner;
 	private static Parser parser;
@@ -75,7 +80,7 @@ public class Compiler {
 	 * @return true iff the source program is free of compile-time errors, otherwise
 	 *         false.
 	 */
-	static boolean compileProgram(String sourceName, String objectName, boolean showingAST, boolean showingTable) {
+	static boolean compileProgram(String sourceName, String objectName, boolean showingAST, boolean showingTable, boolean folding, boolean showTreeAfter) {
 
 		System.out.println("********** " + "Triangle Compiler (Java Version 2.1)" + " **********");
 
@@ -98,6 +103,7 @@ public class Compiler {
 		// scanner.enableDebugging();
 		theAST = parser.parseProgram(); // 1st pass
 		if (reporter.getNumErrors() == 0) {
+			
 			System.out.println("Contextual Analysis ...");
 			checker.check(theAST); // 2nd pass
 
@@ -143,21 +149,38 @@ public class Compiler {
 	 */
 	public static void main(String[] args) {
 
-		// Parse CLI options into the static fields above
-		List<String> extra = Args.parseOrExit(Compiler.class, args);
+		CLIOptions options = new CLIOptions();
 
-		if (extra.isEmpty()) {
-			System.out.println("Usage: tc <filename> [--objectName=<outputfilename>] [--showTree] [--folding] [--showTreeAfter]");
-			System.exit(1);
-		}
+		// Parse flags and get remaining positional args
+        List<String> extraArgs;
+        try {
+            extraArgs = Args.parse(options, args);
+        } catch (IllegalArgumentException ex) {
+            System.out.println("Error parsing arguments: " + ex.getMessage());
+            Args.usage(options);
+            System.exit(1);
+            return; // unreachable, but keeps compiler happy
+        }
+
+        if (extraArgs.isEmpty()) {
+            System.out.println("Usage: tc <sourcefile> [--objectName=<output>] [--showTree] [--folding] [--showTreeAfter]");
+            Args.usage(options);
+            System.exit(1);
+        }
 		
 		
 
-		String sourceName = extra.get(0);
+		String sourceName = extraArgs.get(0);
 		
-		var compiledOK = compileProgram(sourceName, objectName, showTree, false);
+		boolean compiledOK =
+            compileProgram(sourceName,
+                           options.objectName,
+                           options.showTree,
+                           false,                // showingTable unused
+                           options.folding,
+                           options.showTreeAfter);
 
-		if (!showTree && !showTreeAfter) {
+		if (!options.showTree && !options.showTreeAfter) {
 			System.exit(compiledOK ? 0 : 1);
 		}
 	}
