@@ -23,6 +23,8 @@ import java.util.List;
 import com.sampullara.cli.Args;
 import com.sampullara.cli.Argument;
 
+import triangle.contextualAnalyzer.SummaryVisitor;
+
 import triangle.abstractSyntaxTrees.Program;
 import triangle.codeGenerator.Emitter;
 import triangle.codeGenerator.Encoder;
@@ -54,6 +56,9 @@ public class Compiler {
 
     @Argument(description = "Show the AST after folding is complete")
     public boolean showTreeAfter = false;
+
+    @Argument(description = "Show summary statistics of the program")
+    public boolean showStats = false;
 	}
 
 	private static Scanner scanner;
@@ -80,7 +85,13 @@ public class Compiler {
 	 * @return true iff the source program is free of compile-time errors, otherwise
 	 *         false.
 	 */
-	static boolean compileProgram(String sourceName, String objectName, boolean showingAST, boolean showingTable, boolean folding, boolean showTreeAfter) {
+	static boolean compileProgram(String sourceName,
+                                  String objectName,
+                                  boolean showingAST,
+                                  boolean showingTable,
+                                  boolean folding,
+                                  boolean showTreeAfter,
+                                  boolean showStats) {
 
 		System.out.println("********** " + "Triangle Compiler (Java Version 2.1)" + " **********");
 
@@ -103,6 +114,13 @@ public class Compiler {
 		// scanner.enableDebugging();
 		theAST = parser.parseProgram(); // 1st pass
 		if (reporter.getNumErrors() == 0) {
+
+            // Run summary stats if requested (can be done after parsing)
+            if (showStats) {
+                SummaryVisitor visitor = new SummaryVisitor();
+                theAST.visit(visitor, null);
+                visitor.printStats();
+            }
 			
 			System.out.println("Contextual Analysis ...");
 			checker.check(theAST); // 2nd pass
@@ -176,9 +194,10 @@ public class Compiler {
             compileProgram(sourceName,
                            options.objectName,
                            options.showTree,
-                           false,                // showingTable unused
+                           false, // showingTable unused
                            options.folding,
-                           options.showTreeAfter);
+                           options.showTreeAfter,
+                            options.showStats);
 
 		if (!options.showTree && !options.showTreeAfter) {
 			System.exit(compiledOK ? 0 : 1);
