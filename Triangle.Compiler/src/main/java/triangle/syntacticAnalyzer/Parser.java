@@ -320,6 +320,14 @@ public class Parser {
 			accept(Token.Kind.END);
 			break;
 
+        // New case for { ... } blocks
+        // same as BEGIN ... END
+        case LCURLY:
+            acceptIt();
+            commandAST = parseCommand();
+            accept(Token.Kind.RCURLY);
+            break;
+
 		case LET: {
 			acceptIt();
 			Declaration dAST = parseDeclaration();
@@ -357,7 +365,8 @@ public class Parser {
 		case ELSE:
 		case IN:
 		case EOT:
-
+        // Fixed error: Added RCURLY here so "}" is treated as a valid command terminator (EmptyCommand)
+        case RCURLY:
 			finish(commandPos);
 			commandAST = new EmptyCommand(commandPos);
 			break;
