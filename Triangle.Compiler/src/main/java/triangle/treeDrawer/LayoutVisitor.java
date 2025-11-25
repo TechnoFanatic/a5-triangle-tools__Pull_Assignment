@@ -33,6 +33,7 @@ import triangle.abstractSyntaxTrees.aggregates.MultipleRecordAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleArrayAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleRecordAggregate;
 import triangle.abstractSyntaxTrees.commands.AssignCommand;
+import triangle.abstractSyntaxTrees.commands.DoubleAssignCommand;
 import triangle.abstractSyntaxTrees.commands.CallCommand;
 import triangle.abstractSyntaxTrees.commands.EmptyCommand;
 import triangle.abstractSyntaxTrees.commands.IfCommand;
@@ -121,6 +122,13 @@ public class LayoutVisitor implements ActualParameterVisitor<Void, DrawingTree>,
 		var d2 = ast.E.visit(this);
 		return layoutBinary("AssignCom.", d1, d2);
 	}
+
+    // Added visit method for DoubleAssignCommand
+    @Override
+    public DrawingTree visitDoubleAssignCommand(DoubleAssignCommand ast, Void obj) {
+        var d1 = ast.V.visit(this);
+        return layoutUnary("DoubleCom.", d1);
+    }
 
 	@Override
 	public DrawingTree visitCallCommand(CallCommand ast, Void obj) {

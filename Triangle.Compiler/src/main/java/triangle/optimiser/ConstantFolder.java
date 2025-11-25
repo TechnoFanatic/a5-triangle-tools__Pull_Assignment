@@ -15,6 +15,7 @@ import triangle.abstractSyntaxTrees.aggregates.MultipleRecordAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleArrayAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleRecordAggregate;
 import triangle.abstractSyntaxTrees.commands.AssignCommand;
+import triangle.abstractSyntaxTrees.commands.DoubleAssignCommand;
 import triangle.abstractSyntaxTrees.commands.CallCommand;
 import triangle.abstractSyntaxTrees.commands.EmptyCommand;
 import triangle.abstractSyntaxTrees.commands.IfCommand;
@@ -450,6 +451,14 @@ public class ConstantFolder implements ActualParameterVisitor<Void, AbstractSynt
 		ast.V.visit(this);
 		return null;
 	}
+
+    // Added visit method for DoubleAssignCommand
+    @Override
+    public AbstractSyntaxTree visitDoubleAssignCommand(DoubleAssignCommand ast, Void arg) {
+        // We only need to visit the variable V (e.g. to fold indices like a[1+1]**)
+        ast.V.visit(this);
+        return null;
+    }
 
 	@Override
 	public AbstractSyntaxTree visitCallCommand(CallCommand ast, Void arg) {

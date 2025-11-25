@@ -38,6 +38,7 @@ import triangle.abstractSyntaxTrees.aggregates.MultipleRecordAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleArrayAggregate;
 import triangle.abstractSyntaxTrees.aggregates.SingleRecordAggregate;
 import triangle.abstractSyntaxTrees.commands.AssignCommand;
+import triangle.abstractSyntaxTrees.commands.DoubleAssignCommand;
 import triangle.abstractSyntaxTrees.commands.CallCommand;
 import triangle.abstractSyntaxTrees.commands.EmptyCommand;
 import triangle.abstractSyntaxTrees.commands.IfCommand;
@@ -132,6 +133,28 @@ public final class Encoder implements ActualParameterVisitor<Frame, Integer>,
 		encodeStore(ast.V, frame.expand(valSize), valSize);
 		return null;
 	}
+
+    @Override
+    public Void visitDoubleAssignCommand(DoubleAssignCommand ast, Frame frame) {
+        int valSize = Machine.integerSize;
+
+        // 1. Fetch the value of V onto the stack
+        encodeFetch(ast.V, frame, valSize);
+
+        // 2. Push the literal 2 onto the stack
+        emitter.emit(OpCode.LOADL, 2);
+
+        // 3. Call the multiplication routine
+        // The stack now has [..., val, 2], so we expand the frame by 2 words
+        var multRoutine = (RoutineEntity) StdEnvironment.multiplyDecl.entity;
+        multRoutine.encodeCall(emitter, frame.expand(valSize + Machine.integerSize));
+
+        // 4. Store the result back into V
+        // The multiply op replaces the 2 operands with 1 result, so frame is expanded by valSize
+        encodeStore(ast.V, frame.expand(valSize), valSize);
+
+        return null;
+    }
 
 	@Override
 	public Void visitCallCommand(CallCommand ast, Frame frame) {

@@ -168,6 +168,12 @@ public final class Scanner {
 		case '+':
 		case '-':
 		case '*':
+            // handle * and ** as a single OPERATOR token
+            takeIt(); // first '*'
+            if (currentChar == '*') {
+                takeIt(); // second '*', spelling is now "**"
+            }
+            return Token.Kind.OPERATOR;
 		case '/':
 		case '=':
 		case '<':
