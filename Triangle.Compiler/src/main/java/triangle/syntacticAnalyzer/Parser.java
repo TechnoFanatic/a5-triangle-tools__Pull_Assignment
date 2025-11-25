@@ -301,6 +301,19 @@ public class Parser {
 		}
 			break;
 
+        // Add this case
+        case LOOP: {
+            acceptIt();
+            Command c1AST = parseSingleCommand();
+            accept(Token.Kind.WHILE);
+            Expression eAST = parseExpression();
+            accept(Token.Kind.DO);
+            Command c2AST = parseSingleCommand();
+            finish(commandPos);
+            commandAST = new LoopWhileCommand(c1AST, eAST, c2AST, commandPos);
+        }
+        break;
+
 		case BEGIN:
 			acceptIt();
 			commandAST = parseCommand();
