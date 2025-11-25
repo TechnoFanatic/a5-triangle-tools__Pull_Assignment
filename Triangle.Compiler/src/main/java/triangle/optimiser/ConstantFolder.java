@@ -73,6 +73,7 @@ import triangle.abstractSyntaxTrees.visitors.VnameVisitor;
 import triangle.abstractSyntaxTrees.vnames.DotVname;
 import triangle.abstractSyntaxTrees.vnames.SimpleVname;
 import triangle.abstractSyntaxTrees.vnames.SubscriptVname;
+import triangle.syntacticAnalyzer.SourcePosition;
 
 public class ConstantFolder implements ActualParameterVisitor<Void, AbstractSyntaxTree>,
 		ActualParameterSequenceVisitor<Void, AbstractSyntaxTree>, ArrayAggregateVisitor<Void, AbstractSyntaxTree>,
@@ -269,28 +270,23 @@ public class ConstantFolder implements ActualParameterVisitor<Void, AbstractSynt
 
 	@Override
 	public AbstractSyntaxTree visitBinaryExpression(BinaryExpression ast, Void arg) {
-		AbstractSyntaxTree replacement1 = ast.E1.visit(this);
-		AbstractSyntaxTree replacement2 = ast.E2.visit(this);
-		ast.O.visit(this);
 
-		// if visiting a child node returns something, it's either the original constant
-		// (IntegerLiteral) or a folded version replacing the expression at that child
-		// node
-		// If both child nodes are not null; return a folded version of this
-		// BinaryExpression
-		// Otherwise, at least one child node isn't constant (foldable) so just replace
-		// the
-		// foldable child nodes with their folded equivalent and return null
-		if (replacement1 != null && replacement2 != null) {
-			return foldBinaryExpression(replacement1, replacement2, ast.O);
-		} else if (replacement1 != null) {
-			ast.E1 = (Expression) replacement1;
-		} else if (replacement2 != null) {
-			ast.E2 = (Expression) replacement2;
-		}
+        System.out.println("BinaryExpression: " + ast.E1 + " " + ast.O.spelling + " " + ast.E2);
 
-		// if we get here, we can't fold any higher than this level
-		return null;
+        // Visit subexpressions recursively
+        ast.E1 = (Expression) ast.E1.visit(this, arg);
+        ast.E2 = (Expression) ast.E2.visit(this, arg);
+
+
+        // Attempt to fold this binary expression
+        AbstractSyntaxTree folded = foldBinaryExpression(ast.E1, ast.E2, ast.O);
+
+        if (folded != null) {
+            // Increment booleanFoldCount happens inside foldBinaryExpression
+            return folded;  // Replace this node in the AST
+        }
+        // Return the original node so folding can proceed upward
+        return ast;
 	}
 
 	@Override
@@ -584,29 +580,87 @@ public class ConstantFolder implements ActualParameterVisitor<Void, AbstractSynt
 		return null;
 	}
 
-	public AbstractSyntaxTree foldBinaryExpression(AbstractSyntaxTree node1, AbstractSyntaxTree node2, Operator o) {
-		// the only case we know how to deal with for now is two IntegerExpressions
-		if ((node1 instanceof IntegerExpression) && (node2 instanceof IntegerExpression)) {
-			int int1 = (Integer.parseInt(((IntegerExpression) node1).IL.spelling));
-			int int2 = (Integer.parseInt(((IntegerExpression) node2).IL.spelling));
-			Object foldedValue = null;
-			
-			if (o.decl == StdEnvironment.addDecl) {
-				foldedValue = int1 + int2;
-			}
+    private int booleanFoldCount = 0;
 
-			if (foldedValue instanceof Integer) {
-				IntegerLiteral il = new IntegerLiteral(foldedValue.toString(), node1.getPosition());
-				IntegerExpression ie = new IntegerExpression(il, node1.getPosition());
-				ie.type = StdEnvironment.integerType;
-				return ie;
-			} else if (foldedValue instanceof Boolean) {
-				/* currently not handled! */
-			}
-		}
+    public int getBooleanFoldCount() {
+        return booleanFoldCount;
+    }
 
-		// any unhandled situation (i.e., not foldable) is ignored
-		return null;
-	}
+    public AbstractSyntaxTree foldBinaryExpression(AbstractSyntaxTree node1, AbstractSyntaxTree node2, Operator o) {
 
+        System.out.println("Folding: " + node1 + " " + o.spelling + " " + node2);
+
+        // Attempt to get integer values from the nodes
+        Integer int1 = getIntValue(node1);
+        Integer int2 = getIntValue(node2);
+
+        // If either operand is not a literal integer, cannot fold
+        if (int1 == null || int2 == null) return null;
+
+        // ---------- INTEGER RESULTS ----------
+        if (o.decl == StdEnvironment.addDecl || o.spelling.equals("+")) {
+            int result = int1 + int2;
+            IntegerLiteral il = new IntegerLiteral(Integer.toString(result), node1.getPosition());
+            IntegerExpression ie = new IntegerExpression(il, node1.getPosition());
+            ie.type = StdEnvironment.integerType;
+            return ie;
+        }
+
+        // ---------- BOOLEAN RESULTS ----------
+        boolean boolResult = false;
+        boolean isBooleanOperator = true;
+        String op = o.spelling.trim();
+
+        if (o.decl == StdEnvironment.equalDecl || op.equals("=")) {
+            boolResult = (int1 == int2);
+        } else if (o.decl == StdEnvironment.lessDecl || op.equals("<")) {
+            boolResult = (int1 < int2);
+        } else if (o.decl == StdEnvironment.notlessDecl || op.equals(">=")) {
+            boolResult = (int1 >= int2);
+        } else if (o.decl == StdEnvironment.greaterDecl || op.equals(">")) {
+            boolResult = (int1 > int2);
+        } else if (o.decl == StdEnvironment.notgreaterDecl || op.equals("<=")) {
+            boolResult = (int1 <= int2);
+        } else if (o.decl == StdEnvironment.unequalDecl || op.equals("!=") || op.equals("\\=")) {
+            boolResult = (int1 != int2);
+        } else {
+            isBooleanOperator = false;
+        }
+
+        if (isBooleanOperator) {
+            booleanFoldCount++;
+            return makeBooleanExpression(boolResult, node1.getPosition());
+        }
+
+        return null; // cannot fold
+    }
+
+
+    private VnameExpression makeBooleanExpression(boolean value, SourcePosition pos) {
+        String spelling = value ? "true" : "false";
+        Identifier id = new Identifier(spelling, pos);
+
+        // Link to the standard environment boolean declarations
+        id.decl = value ? StdEnvironment.trueDecl : StdEnvironment.falseDecl;
+
+        SimpleVname vname = new SimpleVname(id, pos);
+        VnameExpression vexpr = new VnameExpression(vname, pos);
+
+        vexpr.type = StdEnvironment.booleanType;
+        return vexpr;
+    }
+
+    /**
+     * Extracts integer value from either IntegerExpression or IntegerLiteral nodes.
+     * Returns null if the node is not a literal integer.
+     */
+    private Integer getIntValue(AbstractSyntaxTree node) {
+        if (node instanceof IntegerExpression) {
+            return Integer.parseInt(((IntegerExpression) node).IL.spelling);
+        } else if (node instanceof IntegerLiteral) {
+            return Integer.parseInt(((IntegerLiteral) node).spelling);
+        } else {
+            return null; // not foldable
+        }
+    }
 }
